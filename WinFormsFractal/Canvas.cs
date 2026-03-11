@@ -1,8 +1,6 @@
 using System.Diagnostics;
 using System.IO;
 using System.Numerics;
-using System.Runtime.CompilerServices;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -84,7 +82,7 @@ namespace WinFormsFractal
             }
         }
 
-        private void NewtonsMethod(int w, int h)
+        private void NewtonsMethod(int w, int h, Bitmap targetBmp)
         {
             // map pixel coordinates into the function domain using deltax/deltay and xwidth/yheight
             double localDeltaX = (double)xwidth / (double)w;
@@ -97,10 +95,10 @@ namespace WinFormsFractal
                     double y = (double)(-yheight) / 2.0 + localDeltaY * py;
 
                     Complex zstart = new Complex(x, y);
-                    Complex znext = zstart - Functions.F(zstart) / Functions.FP(zstart);  // Newton's method here
+                    Complex znext = zstart - Functions.F(zstart) / Functions.FP(zstart);
                     int iterations = 1;
                     double mag = (znext - zstart).Magnitude;
-                    while (mag > tolerance && iterations < maxiterations)   // while you are not close enough to the root and you haven't exceeded the maxiterations
+                    while (mag > tolerance && iterations < maxiterations)
                     {
                         zstart = znext;
                         znext = zstart - Functions.F(zstart) / Functions.FP(zstart);
@@ -115,7 +113,6 @@ namespace WinFormsFractal
                     }
                     else
                     {
-                        // use combined hue from final iterate argument and iteration count to spread colors
                         double arg = Math.Atan2(znext.Imaginary, znext.Real);
                         int hueFromArg = (int)Math.Round(((arg / (2.0 * Math.PI)) + 0.5) * 360.0) % 360;
                         int hueIndex = (hueFromArg + iterations * 17) % 360;
@@ -123,10 +120,10 @@ namespace WinFormsFractal
                         color = Color.FromArgb(cs.red, cs.green, cs.blue);
                     }
 
-                    bmp.SetPixel(px, py, color);
+                    targetBmp.SetPixel(px, py, color);
                 }
             }
-        }  // end of NewtonsMethod declaration
+        }
 
         private void HailStone(int startingX, int startingY)
         {
@@ -223,41 +220,7 @@ namespace WinFormsFractal
                     }
 
                     var renderBmp = new Bitmap(targetW, targetH);
-                    double localDeltaX = (double)xwidth / (double)targetW;
-                    double localDeltaY = (double)yheight / (double)targetH;
-                    for (int px = 0; px < targetW; px++)
-                    {
-                        for (int py = 0; py < targetH; py++)
-                        {
-                            double x = (double)(-xwidth) / 2.0 + localDeltaX * px;
-                            double y = (double)(-yheight) / 2.0 + localDeltaY * py;
-
-                            Complex zstart = new Complex(x, y);
-                            Complex znext = zstart - Functions.F(zstart) / Functions.FP(zstart);
-                            int iterations = 1;
-                            double mag = (znext - zstart).Magnitude;
-                            while (mag > tolerance && iterations < maxiterations)
-                            {
-                                zstart = znext;
-                                znext = zstart - Functions.F(zstart) / Functions.FP(zstart);
-                                mag = (znext - zstart).Magnitude;
-                                iterations++;
-                            }
-                            Color color;
-                            if (iterations >= maxiterations)
-                                color = Color.FromArgb(0, 0, 0);
-                            else
-                            {
-                                // combine iteration count with the final iterate's argument to spread hues
-                                double arg = Math.Atan2(znext.Imaginary, znext.Real);
-                                int hueFromArg = (int)Math.Round(((arg / (2.0 * Math.PI)) + 0.5) * 360.0) % 360;
-                                int hueIndex = (hueFromArg + iterations * 17) % 360; // 17 spreads bands around palette
-                                var cs = ColorPalettes.Spectrum360[(hueIndex + 360) % 360];
-                                color = Color.FromArgb(cs.red, cs.green, cs.blue);
-                            }
-                            renderBmp.SetPixel(px, py, color);
-                        }
-                    }
+                    NewtonsMethod(targetW, targetH, renderBmp);
 
                     Directory.CreateDirectory(@"C:\Temp");
                     renderBmp.Save(@"C:\Temp\fractal.jpg", System.Drawing.Imaging.ImageFormat.Jpeg);
