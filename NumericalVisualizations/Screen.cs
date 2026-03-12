@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Numerics;
 
-namespace WinFormsFractal
+namespace NumericalVisualizations
 {
     public class ScreenStructures
     {

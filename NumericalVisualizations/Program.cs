@@ -1,4 +1,4 @@
-namespace WinFormsFractal
+namespace NumericalVisualizations
 {
     internal static class Program
     {

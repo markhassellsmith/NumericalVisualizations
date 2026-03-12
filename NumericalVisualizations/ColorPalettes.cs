@@ -1,6 +1,6 @@
-﻿using static WinFormsFractal.ScreenStructures;
+﻿using static NumericalVisualizations.ScreenStructures;
 
-namespace WinFormsFractal
+namespace NumericalVisualizations
 {
     public class ColorPalettes
     {
