@@ -219,8 +219,6 @@
             Name = "Canvas";
             Text = "Numerical Visualizations";
             Paint += Canvas_Paint;
-            MouseDown += Canvas_MouseDown;
-            MouseUp += Canvas_MouseUp;
             menuStrip1.ResumeLayout(false);
             menuStrip1.PerformLayout();
             toolStrip1.ResumeLayout(false);

@@ -28,6 +28,21 @@ namespace NumericalVisualizations
         private Point _pdown;
         private Point _pup;
 
+        // Zoom state
+        private bool _isDraggingZoom = false;
+        private Point _zoomDragStart;
+        private Point _zoomDragCurrent;
+        private double _currentZoomLevel = 1.0;  // 1.0 = 100%
+        private double _currentXRange = XWidth;
+        private double _currentYRange = YHeight;
+
+        // Transient zoom feedback
+        private bool _showZoomPercentage = false;
+        private Point _zoomPercentageLocation;
+        private int _zoomPercentage = 100;
+        private System.Windows.Forms.Timer? _zoomFeedbackTimer;
+        private DateTime _lastMouseMoveUpdate = DateTime.MinValue;
+
         #endregion CanvasVariables
 
         #region CanvasMethods
@@ -40,11 +55,32 @@ namespace NumericalVisualizations
             panel1.Paint += Panel1_Paint;  // Add paint handler for welcome message
             _currentVisualization = null;  // Don't create visualization until user selects one
 
+            // Enable double buffering to reduce flicker
+            typeof(Panel).InvokeMember("DoubleBuffered",
+                System.Reflection.BindingFlags.SetProperty | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+                null, panel1, new object[] { true });
+
             // Initialize toolbar as disabled
             UpdateToolbarFromConfig();
 
             // Use professional renderer that respects custom colors
             toolStrip1.Renderer = new ToolStripProfessionalRenderer(new CustomColorTable());
+
+            // Initialize zoom feedback timer
+            _zoomFeedbackTimer = new System.Windows.Forms.Timer();
+            _zoomFeedbackTimer.Interval = 1000; // Hide after 1 second
+            _zoomFeedbackTimer.Tick += (s, e) =>
+            {
+                _showZoomPercentage = false;
+                _zoomFeedbackTimer?.Stop();
+                panel1.Invalidate();
+            };
+
+            // Register mouse events on panel1 (where visualization is displayed)
+            panel1.MouseWheel += Panel1_MouseWheel;
+            panel1.MouseDown += Panel1_MouseDown;
+            panel1.MouseMove += Panel1_MouseMove;
+            panel1.MouseUp += Panel1_MouseUp;
         }
 
         // Custom color table for checked toolbar buttons
@@ -74,6 +110,11 @@ namespace NumericalVisualizations
             _visualizationSelected = true;
             _imageRendered = false;
             _renderingInProgress = false;  // Reset to allow new render
+
+            // Reset zoom state
+            _currentXRange = XWidth;
+            _currentYRange = YHeight;
+            _currentZoomLevel = 1.0;
 
             // Invalidate cache when changing visualizations
             _cachedBaseVisualization?.Dispose();
@@ -158,6 +199,71 @@ namespace NumericalVisualizations
                 float y = (panel1.Height - size.Height) / 2;
 
                 e.Graphics.DrawString(message, font, brush, new RectangleF(x, y, size.Width, size.Height));
+                return;
+            }
+
+            // Enable high quality rendering for overlays
+            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+
+            // Draw zoom rectangle if dragging
+            if (_isDraggingZoom)
+            {
+                int x1 = Math.Min(_zoomDragStart.X, _zoomDragCurrent.X);
+                int y1 = Math.Min(_zoomDragStart.Y, _zoomDragCurrent.Y);
+                int x2 = Math.Max(_zoomDragStart.X, _zoomDragCurrent.X);
+                int y2 = Math.Max(_zoomDragStart.Y, _zoomDragCurrent.Y);
+
+                int width = x2 - x1;
+                int height = y2 - y1;
+
+                if (width > 0 && height > 0)
+                {
+                    using var pen = new Pen(Color.Yellow, 3);  // Thicker for visibility
+                    using var brush = new SolidBrush(Color.FromArgb(40, 255, 255, 0)); // Semi-transparent yellow
+
+                    Rectangle rect = new Rectangle(x1, y1, width, height);
+                    e.Graphics.FillRectangle(brush, rect);
+                    e.Graphics.DrawRectangle(pen, rect);
+
+                    // Draw zoom info near rectangle
+                    string info = $"Zoom to selection ({width}×{height})";
+                    using var font = new Font("Arial", 12, FontStyle.Bold);
+                    using var textBrush = new SolidBrush(Color.Yellow);
+                    using var backBrush = new SolidBrush(Color.FromArgb(200, 0, 0, 0));
+
+                    var textSize = e.Graphics.MeasureString(info, font);
+                    float textX = x1 + 5;
+                    float textY = y1 - textSize.Height - 5;
+
+                    // Keep text on screen
+                    if (textY < 0) textY = y1 + 5;
+                    if (textX + textSize.Width > panel1.Width) textX = panel1.Width - textSize.Width - 5;
+
+                    e.Graphics.FillRectangle(backBrush, textX - 3, textY - 2, textSize.Width + 6, textSize.Height + 4);
+                    e.Graphics.DrawString(info, font, textBrush, textX, textY);
+                }
+            }
+
+            // Draw zoom percentage if active
+            if (_showZoomPercentage)
+            {
+                string zoomText = $"{_zoomPercentage}%";
+                using var font = new Font("Arial", 18, FontStyle.Bold);  // Larger font
+                using var textBrush = new SolidBrush(Color.Yellow);
+                using var backBrush = new SolidBrush(Color.FromArgb(220, 0, 0, 0));  // More opaque
+
+                var textSize = e.Graphics.MeasureString(zoomText, font);
+                float textX = _zoomPercentageLocation.X + 20;
+                float textY = _zoomPercentageLocation.Y - textSize.Height / 2;
+
+                // Keep on screen
+                if (textX + textSize.Width > panel1.Width) textX = _zoomPercentageLocation.X - textSize.Width - 20;
+                if (textY < 0) textY = 5;
+                if (textY + textSize.Height > panel1.Height) textY = panel1.Height - textSize.Height - 5;
+
+                e.Graphics.FillRectangle(backBrush, textX - 8, textY - 4, textSize.Width + 16, textSize.Height + 8);
+                e.Graphics.DrawString(zoomText, font, textBrush, textX, textY);
             }
         }
 
@@ -236,17 +342,178 @@ namespace NumericalVisualizations
 
         #region MouseMethods
 
-        private void Canvas_MouseDown(object sender, MouseEventArgs e)
+        private void Panel1_MouseDown(object sender, MouseEventArgs e)
         {
             _pdown = e.Location;
+
+            // Start drag-to-zoom with left button
+            if (e.Button == MouseButtons.Left && _imageRendered)
+            {
+                _isDraggingZoom = true;
+                _zoomDragStart = e.Location;
+                _zoomDragCurrent = e.Location;
+            }
         }
 
-        private void Canvas_MouseUp(object sender, MouseEventArgs e)
+        private void Panel1_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (_isDraggingZoom)
+            {
+                _zoomDragCurrent = e.Location;
+
+                // Throttle redraws to reduce flicker (max 60 FPS)
+                var now = DateTime.Now;
+                if ((now - _lastMouseMoveUpdate).TotalMilliseconds > 16)
+                {
+                    _lastMouseMoveUpdate = now;
+                    panel1.Invalidate(); // Redraw to show selection rectangle
+                }
+            }
+        }
+
+        private void Panel1_MouseUp(object sender, MouseEventArgs e)
         {
             _pup = e.Location;
+
+            if (_isDraggingZoom && e.Button == MouseButtons.Left)
+            {
+                _isDraggingZoom = false;
+
+                // Calculate zoom rectangle
+                int x1 = Math.Min(_zoomDragStart.X, e.Location.X);
+                int y1 = Math.Min(_zoomDragStart.Y, e.Location.Y);
+                int x2 = Math.Max(_zoomDragStart.X, e.Location.X);
+                int y2 = Math.Max(_zoomDragStart.Y, e.Location.Y);
+
+                int width = x2 - x1;
+                int height = y2 - y1;
+
+                // Only zoom if rectangle is significant (not just a click)
+                if (width > 10 && height > 10)
+                {
+                    ApplyDragZoom(x1, y1, width, height);
+                }
+
+                panel1.Invalidate();
+            }
+        }
+
+        private void Panel1_MouseWheel(object? sender, MouseEventArgs e)
+        {
+            if (!_imageRendered || _currentVisualization == null) return;
+
+            // Zoom factor: wheel up = zoom in, wheel down = zoom out
+            double zoomFactor = e.Delta > 0 ? 0.9 : 1.1;  // 10% change per notch
+
+            // Apply zoom centered on current view
+            _currentXRange *= zoomFactor;
+            _currentYRange *= zoomFactor;
+            _currentZoomLevel /= zoomFactor;
+
+            // Update zoom percentage display
+            _zoomPercentage = (int)(_currentZoomLevel * 100);
+            _showZoomPercentage = true;
+            _zoomPercentageLocation = e.Location;
+
+            // Reset timer
+            _zoomFeedbackTimer?.Stop();
+            _zoomFeedbackTimer?.Start();
+
+            // Trigger redraw to show percentage overlay
+            panel1.Invalidate();
+
+            // Re-render with new zoom
+            RenderCurrentVisualization();
         }
 
         #endregion MouseMethods
+
+        #region ZoomMethods
+
+        private void ApplyDragZoom(int screenX, int screenY, int screenWidth, int screenHeight)
+        {
+            if (_bmp == null || panel1.Width == 0 || panel1.Height == 0) return;
+
+            // Calculate what portion of the current view this rectangle represents
+            double xRatio = (double)screenWidth / panel1.Width;
+            double yRatio = (double)screenHeight / panel1.Height;
+
+            // Minimum zoom to prevent too-small selections (5% of screen)
+            if (xRatio < 0.05 || yRatio < 0.05)
+            {
+                MessageBox.Show("Selection too small. Please select a larger area to zoom.",
+                    "Zoom", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // For center-based visualizations (Newton, Mandelbrot, Hailstone auto-scale),
+            // we zoom by reducing the range proportionally to the selection
+            // Note: This zooms centered at origin - pan functionality would require 
+            // modifying the visualization Render() interface to support center offsets
+
+            _currentXRange *= xRatio;
+            _currentYRange *= yRatio;
+            _currentZoomLevel /= Math.Max(xRatio, yRatio);
+
+            // Show zoom feedback
+            _zoomPercentage = (int)(_currentZoomLevel * 100);
+            _showZoomPercentage = true;
+            _zoomPercentageLocation = new Point(screenX + screenWidth / 2, screenY + screenHeight / 2);
+            _zoomFeedbackTimer?.Stop();
+            _zoomFeedbackTimer?.Start();
+
+            // Re-render with new zoom
+            RenderCurrentVisualization();
+        }
+
+        private void RenderCurrentVisualization()
+        {
+            if (_currentVisualization == null || _renderingInProgress) return;
+
+            _renderingInProgress = true;
+            _imageRendered = false;
+
+            _renderTask = Task.Run(() =>
+            {
+                try
+                {
+                    var renderBmp = _currentVisualization.Render(
+                        MaxHorizontal, 
+                        MaxVertical, 
+                        _currentXRange, 
+                        _currentYRange);
+
+                    BeginInvoke(() =>
+                    {
+                        try
+                        {
+                            _bmp?.Dispose();
+                            _bmp = renderBmp;
+                            panel1.BackgroundImage = _bmp;
+                            _imageRendered = true;
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show("UI update failed: " + ex.Message);
+                        }
+                        finally
+                        {
+                            _renderingInProgress = false;
+                        }
+                    });
+                }
+                catch (Exception ex)
+                {
+                    BeginInvoke(() =>
+                    {
+                        MessageBox.Show("Rendering failed: " + ex.Message);
+                        _renderingInProgress = false;
+                    });
+                }
+            });
+        }
+
+        #endregion ZoomMethods
 
         #region MenuEventHandlers
 
