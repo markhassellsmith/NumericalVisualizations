@@ -60,11 +60,11 @@ namespace NumericalVisualizations.Visualizations
             return new MandelbrotVisualization(config as MandelbrotConfig);
         }
 
-        public Bitmap Render(int width, int height, double xRange, double yRange)
+        public Bitmap Render(int width, int height, double xRange, double yRange, double centerX = 0.0, double centerY = 0.0)
         {
             var bitmap = new Bitmap(width, height);
 
-            RenderingHelpers.RenderFast(bitmap, xRange, yRange, (x, y) =>
+            RenderingHelpers.RenderFast(bitmap, xRange, yRange, centerX, centerY, (x, y) =>
             {
                 Complex c = new(x, y);
                 Complex zstart = Complex.Zero;

@@ -24,8 +24,10 @@ namespace NumericalVisualizations.Visualizations
         /// <param name="height">Target bitmap height</param>
         /// <param name="xRange">Horizontal range to visualize</param>
         /// <param name="yRange">Vertical range to visualize</param>
+        /// <param name="centerX">X coordinate of view center (default 0.0)</param>
+        /// <param name="centerY">Y coordinate of view center (default 0.0)</param>
         /// <returns>Rendered bitmap</returns>
-        Bitmap Render(int width, int height, double xRange, double yRange);
+        Bitmap Render(int width, int height, double xRange, double yRange, double centerX = 0.0, double centerY = 0.0);
 
         /// <summary>
         /// Get the current configuration object for this visualization

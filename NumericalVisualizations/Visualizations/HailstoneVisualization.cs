@@ -107,7 +107,7 @@ namespace NumericalVisualizations.Visualizations
             return new HailstoneVisualization(config as HailstoneConfig);
         }
 
-        public Bitmap Render(int width, int height, double xRange, double yRange)
+        public Bitmap Render(int width, int height, double xRange, double yRange, double centerX = 0.0, double centerY = 0.0)
         {
             var bitmap = new Bitmap(width, height);
             using var graphics = Graphics.FromImage(bitmap);
@@ -189,9 +189,9 @@ namespace NumericalVisualizations.Visualizations
             minY -= paddingY;
             maxY += paddingY;
 
-            // Calculate center and range
-            double centerX = (minX + maxX) / 2.0;
-            double centerY = (minY + maxY) / 2.0;
+            // Calculate center and range (renamed to avoid conflict with Render parameters)
+            double dataCenterX = (minX + maxX) / 2.0;
+            double dataCenterY = (minY + maxY) / 2.0;
             double dataRangeX = maxX - minX;
             double dataRangeY = maxY - minY;
 

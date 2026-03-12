@@ -35,6 +35,8 @@ namespace NumericalVisualizations
         private double _currentZoomLevel = 1.0;  // 1.0 = 100%
         private double _currentXRange = XWidth;
         private double _currentYRange = YHeight;
+        private double _zoomCenterX = 0.0;  // X center of current view
+        private double _zoomCenterY = 0.0;  // Y center of current view
 
         // Transient zoom feedback
         private bool _showZoomPercentage = false;
@@ -115,6 +117,8 @@ namespace NumericalVisualizations
             _currentXRange = XWidth;
             _currentYRange = YHeight;
             _currentZoomLevel = 1.0;
+            _zoomCenterX = 0.0;
+            _zoomCenterY = 0.0;
 
             // Invalidate cache when changing visualizations
             _cachedBaseVisualization?.Dispose();
@@ -296,7 +300,7 @@ namespace NumericalVisualizations
                         targetH = Math.Max(1, (int)Math.Round(MaxHorizontal / panelRatio));
                     }
 
-                    var renderBmp = _currentVisualization.Render(targetW, targetH, XWidth, YHeight);
+                    var renderBmp = _currentVisualization.Render(targetW, targetH, XWidth, YHeight, 0.0, 0.0);
 
                     // Cache the base visualization (without axes overlay) for fast axes toggling
                     // Only cache for Newton/Mandelbrot (fractals with overlay axes)
@@ -446,11 +450,19 @@ namespace NumericalVisualizations
                 return;
             }
 
-            // For center-based visualizations (Newton, Mandelbrot, Hailstone auto-scale),
-            // we zoom by reducing the range proportionally to the selection
-            // Note: This zooms centered at origin - pan functionality would require 
-            // modifying the visualization Render() interface to support center offsets
+            // Calculate center of selection in screen coordinates (normalized -0.5 to 0.5)
+            double selectionCenterXNorm = (screenX + screenWidth / 2.0 - panel1.Width / 2.0) / panel1.Width;
+            double selectionCenterYNorm = -(screenY + screenHeight / 2.0 - panel1.Height / 2.0) / panel1.Height;  // Negative because screen Y is inverted
 
+            // Convert to world coordinates based on current view
+            double selectionCenterXWorld = _zoomCenterX + selectionCenterXNorm * _currentXRange;
+            double selectionCenterYWorld = _zoomCenterY + selectionCenterYNorm * _currentYRange;
+
+            // Update zoom center to the selection center
+            _zoomCenterX = selectionCenterXWorld;
+            _zoomCenterY = selectionCenterYWorld;
+
+            // Update ranges based on selection size
             _currentXRange *= xRatio;
             _currentYRange *= yRatio;
             _currentZoomLevel /= Math.Max(xRatio, yRatio);
@@ -462,7 +474,7 @@ namespace NumericalVisualizations
             _zoomFeedbackTimer?.Stop();
             _zoomFeedbackTimer?.Start();
 
-            // Re-render with new zoom
+            // Re-render with new zoom and center
             RenderCurrentVisualization();
         }
 
@@ -481,7 +493,9 @@ namespace NumericalVisualizations
                         MaxHorizontal, 
                         MaxVertical, 
                         _currentXRange, 
-                        _currentYRange);
+                        _currentYRange,
+                        _zoomCenterX,
+                        _zoomCenterY);
 
                     BeginInvoke(() =>
                     {

@@ -14,11 +14,15 @@ namespace NumericalVisualizations.Performance
         /// <param name="bitmap">Target bitmap to render into</param>
         /// <param name="xRange">Horizontal range in coordinate space</param>
         /// <param name="yRange">Vertical range in coordinate space</param>
+        /// <param name="centerX">X coordinate of view center</param>
+        /// <param name="centerY">Y coordinate of view center</param>
         /// <param name="calculatePixel">Function to calculate color for each (x,y) coordinate</param>
         public static unsafe void RenderFast(
             Bitmap bitmap,
             double xRange,
             double yRange,
+            double centerX,
+            double centerY,
             Func<double, double, Color> calculatePixel)
         {
             int width = bitmap.Width;
@@ -40,12 +44,12 @@ namespace NumericalVisualizations.Performance
 
                     for (int x = 0; x < width; x++)
                     {
-                        // Map pixel coordinates to mathematical coordinates
-                        // X: left=-xRange/2, center=0, right=+xRange/2
-                        double xVal = -xRange / 2.0 + deltaX * x;
+                        // Map pixel coordinates to mathematical coordinates centered at (centerX, centerY)
+                        // X: left=centerX-xRange/2, center=centerX, right=centerX+xRange/2
+                        double xVal = centerX - xRange / 2.0 + deltaX * x;
 
-                        // Y: top=+yRange/2, center=0, bottom=-yRange/2 (flipped for mathematical convention)
-                        double yVal = yRange / 2.0 - deltaY * y;
+                        // Y: top=centerY+yRange/2, center=centerY, bottom=centerY-yRange/2 (flipped for mathematical convention)
+                        double yVal = centerY + yRange / 2.0 - deltaY * y;
 
                         Color color = calculatePixel(xVal, yVal);
 
