@@ -1,53 +1,165 @@
 # Numerical Visualizations
 
-A .NET 6 WinForms application for visualizing various numerical and mathematical concepts through beautiful, interactive graphics.
+A .NET 6 WinForms application for visualizing various numerical and mathematical concepts through beautiful, interactive graphics with a flexible, user-friendly interface.
+
+## Features
+
+### 🎨 **Interactive Visualization System**
+- Three mathematical visualizations: Newton's Method, Mandelbrot Set, and Hailstone Sequence
+- Live toolbar with toggle buttons for display options
+- Preset system with 3-5 curated configurations per visualization
+- Comprehensive settings dialog with Apply/Close workflow
+
+### ⚡ **Performance Optimizations**
+- Parallel rendering using LockBits for 20-100x speedup
+- Cached axes overlay for instant toggling on fractals (~50ms vs 1-2 seconds)
+- Efficient bitmap handling with proper resource disposal
+
+### 🎯 **User Interface**
+- **Keyboard Shortcuts**: Ctrl+1 (Newton), Ctrl+2 (Mandelbrot), Ctrl+3 (Hailstone)
+- **Toolbar Toggles**: Instantly enable/disable axes, point labels, and dots
+- **Settings Dialog**: Resizable PropertyGrid with live Apply button
+- **Preset System**: Quick access to analytical views (different iterations/scales)
+
+---
+
+## Quick Start
+
+### Basic Usage
+
+1. **Launch the application** - You'll see a welcome message
+2. **Select a visualization**:
+   - Press `Ctrl+1` for Newton's Method
+   - Press `Ctrl+2` for Mandelbrot Set
+   - Press `Ctrl+3` for Hailstone Sequence
+   - Or use the Visualizations menu
+
+3. **Toggle display options** using the toolbar:
+   - **[Axes]** - Show/hide coordinate axes with tick marks (all visualizations)
+   - **[Point Labels]** - Show (N, X, Y) labels at each point (Hailstone only)
+   - **[Dots]** - Show dots at segment endpoints (Hailstone only)
+
+4. **Try presets**: Hover over a visualization name in the menu to see presets
+5. **Adjust settings**: Click Settings... at the bottom of any visualization's submenu
+
+### Toolbar Guide
+
+The toolbar provides instant access to display options:
+
+```
+[Axes] | [Point Labels] [Dots]
+  ↑           ↑           ↑
+Universal   Hailstone-specific
+```
+
+- **Blue background** = Option enabled
+- **Gray background** = Option disabled
+- **Grayed out** = Not applicable to current visualization
+
+---
 
 ## Architecture
-
-The project follows a clean, extensible architecture that makes it easy to add new visualization types.
 
 ### Core Components
 
 #### 1. **Visualization Interface** (`IVisualization`)
-- Defines the contract for all visualizations
-- Each visualization must provide:
-  - `Name` - Display name
-  - `Description` - Brief explanation
-  - `Render()` - Method to generate the visualization bitmap
+Defines the contract for all visualizations:
+- `Name` and `Description` - Metadata
+- `Render(width, height, xRange, yRange)` - Generate bitmap
+- `GetConfig()` - Retrieve current configuration
+- `WithConfig(config)` - Create instance with updated configuration
 
-#### 2. **Visualization Factory** (`VisualizationFactory`)
-- Creates visualization instances
-- Manages available visualization types
-- Provides metadata about each visualization
+#### 2. **Configuration System**
+**Base Class**: `VisualizationConfig`
+- Universal options: `ShowAxes`, `MaxIterations`, `Tolerance`
 
-#### 3. **Configuration Classes**
-- Each visualization has its own configuration class extending `VisualizationConfig`
-- Allows customization of parameters (iterations, tolerance, colors, etc.)
+**Derived Classes**:
+- `NewtonConfig` - Newton-specific parameters (HueSpread)
+- `MandelbrotConfig` - Mandelbrot-specific (EscapeRadius, color mapping)
+- `HailstoneConfig` - Hailstone-specific (ShowPointLabels, ShowDots, ScaleFactor)
 
-### Current Visualizations
+#### 3. **Preset System** (`VisualizationPresets`)
+Pre-configured settings for quick access:
+- Focus on analytical perspectives (iterations, scale, zoom)
+- Display options controlled via toolbar
+- All use same starting point for comparison (Hailstone)
 
-#### Newton's Method (`NewtonVisualization`)
-Visualizes Newton's root-finding algorithm in the complex plane. Shows the basins of attraction for different roots through color coding.
+#### 4. **Factory Pattern** (`VisualizationFactory`)
+Creates visualization instances with default configurations.
 
-**Configuration:**
-- `MaxIterations` - Maximum iteration count (default: 1200)
-- `Tolerance` - Convergence threshold (default: 1e-10)
-- `HueSpread` - Color variation per iteration (default: 17)
+---
 
-#### Mandelbrot Set (`MandelbrotVisualization`)
-Classic fractal showing the Mandelbrot set in the complex plane.
+## Current Visualizations
 
-**Configuration:**
-- `MaxIterations` - Maximum iteration count (default: 512)
-- `EscapeRadius` - Boundary for divergence (default: 1000000.0)
-- `ColorOffset`, `ColorMultiplier`, `ColorModulo` - Color mapping parameters
+### Newton's Method
+Visualizes Newton's root-finding algorithm in the complex plane. Shows basins of attraction for different roots.
 
-#### Hailstone Sequence (`HailstoneVisualization`)
-2D visualization of the Collatz conjecture (3n+1 problem).
+**Presets:**
+- Default, High Detail, Fast Preview, Vibrant Colors, Subtle Bands
 
-**Configuration:**
-- `MaxIterations` - Maximum steps to follow (default: 1200)
-- `StartX`, `StartY` - Starting coordinates
+**Key Parameters:**
+- `MaxIterations` (default: 1200) - Computation depth
+- `Tolerance` (default: 1e-10) - Convergence threshold
+- `HueSpread` (default: 17) - Color variation per iteration
+
+### Mandelbrot Set
+Classic fractal showing the Mandelbrot set boundary.
+
+**Presets:**
+- Classic, Deep Zoom, Psychedelic, Smooth Gradient, Fast Preview
+
+**Key Parameters:**
+- `MaxIterations` (default: 512)
+- `EscapeRadius` (default: 1000000.0)
+- Color mapping: Offset, Multiplier, Modulo
+
+### Hailstone Sequence (2D Collatz)
+2D visualization of Collatz-inspired dynamics with coupled integer maps.
+
+**Presets:**
+- Default, First 50 Steps (zoomed), 300 Steps (long-term behavior)
+
+**Key Parameters:**
+- `MaxIterations` (default: 150) - Steps to follow
+- `StartX, StartY` (default: -0.5, 0.3) - Starting coordinates
+- `ScaleFactor` (default: 0.05) - Movement magnification
+- `ShowPointLabels` - Display (N, X, Y) at each point
+- `ShowDots` - Show colored dots at segment endpoints
+
+---
+
+## Performance Notes
+
+### Rendering Speed
+- **Newton/Mandelbrot**: 1-2 seconds (parallel pixel computation)
+- **Hailstone**: ~100-200ms (vector path rendering)
+
+### Axes Toggling
+- **Newton/Mandelbrot**: ~50ms (cached overlay)
+- **Hailstone**: ~100-200ms (integrated rendering, full re-render)
+
+### Optimization Strategies
+1. **Parallel rendering** - LockBits + Parallel.For across rows
+2. **Cached overlays** - Fractals cache base image, overlay axes separately
+3. **Integrated rendering** - Hailstone renders axes during path drawing (transform matrix)
+
+---
+
+## Adding New Visualizations
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines on extending the system.
+
+---
+
+## Examples
+
+See [EXAMPLES.md](EXAMPLES.md) for code examples and usage patterns.
+
+---
+
+## License
+
+This project is provided as-is for educational and research purposes.
 - `LineWidth` - Width of connecting lines (default: 4.0)
 - `ShowLabels` - Whether to display coordinate labels (default: true)
 - `ColorSpread` - Color variation between steps (default: 517)

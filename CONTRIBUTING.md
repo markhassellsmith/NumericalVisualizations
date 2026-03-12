@@ -1,277 +1,216 @@
-# Contributor's Guide - Adding New Visualizations
+# Contributing to Numerical Visualizations
 
-This guide walks you through adding a new visualization type to the project.
+Thank you for your interest in contributing! This guide will help you add new visualizations and extend the system.
 
-## Step-by-Step Tutorial
+---
 
-Let's add a **Julia Set** visualization as an example.
+## Table of Contents
+1. [Architecture Overview](#architecture-overview)
+2. [Adding a New Visualization](#adding-a-new-visualization)
+3. [Adding Presets](#adding-presets)
+4. [Display Options](#display-options)
+5. [Performance Considerations](#performance-considerations)
+6. [Testing Guidelines](#testing-guidelines)
 
-### Step 1: Create the Configuration Class
+---
 
-Create a new file `JuliaVisualization.cs` in the `Visualizations` folder:
+## Architecture Overview
+
+### Key Components
+
+1. **IVisualization** - Interface all visualizations implement
+2. **VisualizationConfig** - Base configuration class
+3. **VisualizationFactory** - Creates visualization instances
+4. **VisualizationPresets** - Predefined configurations
+5. **Canvas** - Main UI coordinator
+
+### Configuration Hierarchy
+
+```
+VisualizationConfig (base)
+├─ ShowAxes (universal)
+├─ MaxIterations
+└─ Tolerance
+
+NewtonConfig : VisualizationConfig
+└─ HueSpread
+
+MandelbrotConfig : VisualizationConfig
+├─ EscapeRadius
+└─ Color mapping parameters
+
+HailstoneConfig : VisualizationConfig
+├─ ShowPointLabels (specific)
+├─ ShowDots (specific)
+└─ Path rendering parameters
+```
+
+---
+
+## Adding a New Visualization
+
+Follow these steps to add a new visualization type.
+
+### Step 1: Create Configuration Class
 
 ```csharp
-using System.Drawing;
-using System.Numerics;
-using static NumericalVisualizations.ScreenStructures;
+using System.ComponentModel;
 
-namespace NumericalVisualizations.Visualizations
+public class MyVisualizationConfig : VisualizationConfig
 {
-    /// <summary>
-    /// Configuration for Julia set visualization
-    /// </summary>
-    public class JuliaConfig : VisualizationConfig
+    [Category("Algorithm")]
+    [Description("Your algorithm parameter")]
+    public int MyParameter { get; set; } = 100;
+    
+    [Category("Appearance")]
+    [Description("Visual parameter")]
+    public double MyVisualSetting { get; set; } = 1.0;
+    
+    public MyVisualizationConfig()
     {
-        // Julia set constant (try different values for different sets)
-        public Complex C { get; set; } = new Complex(-0.7, 0.27015);
-        
-        public double EscapeRadius { get; set; } = 2.0;
-        public int ColorOffset { get; set; } = 0;
-        
-        public JuliaConfig()
-        {
-            MaxIterations = 256;
-            Tolerance = 0.0;
-        }
-    }
-
-    /// <summary>
-    /// Julia set fractal visualization
-    /// </summary>
-    public class JuliaVisualization : IVisualization
-    {
-        private readonly JuliaConfig _config;
-
-        public string Name => "Julia Set";
-        public string Description => "Julia set fractal with configurable constant";
-
-        public JuliaVisualization(JuliaConfig? config = null)
-        {
-            _config = config ?? new JuliaConfig();
-        }
-
-        public Bitmap Render(int width, int height, double xRange, double yRange)
-        {
-            var bitmap = new Bitmap(width, height);
-            double deltaX = xRange / width;
-            double deltaY = yRange / height;
-
-            for (int px = 0; px < width; px++)
-            {
-                for (int py = 0; py < height; py++)
-                {
-                    double x = -xRange / 2.0 + deltaX * px;
-                    double y = -yRange / 2.0 + deltaY * py;
-                    
-                    Complex z = new Complex(x, y);
-                    int iterations = 0;
-
-                    while (z.Magnitude < _config.EscapeRadius && iterations < _config.MaxIterations)
-                    {
-                        z = z * z + _config.C;
-                        iterations++;
-                    }
-
-                    Color color;
-                    if (z.Magnitude >= _config.EscapeRadius)
-                    {
-                        int colorIndex = (iterations + _config.ColorOffset) % 360;
-                        var cs = ColorPalettes.Spectrum360[colorIndex];
-                        color = Color.FromArgb(cs.red, cs.green, cs.blue);
-                    }
-                    else
-                    {
-                        color = Color.FromArgb(0, 0, 0);
-                    }
-
-                    bitmap.SetPixel(px, py, color);
-                }
-            }
-
-            return bitmap;
-        }
+        MaxIterations = 500;
+        Tolerance = 1e-8;
+        ShowAxes = false;
     }
 }
 ```
 
-### Step 2: Update the Factory
-
-Edit `VisualizationFactory.cs`:
+### Step 2: Implement IVisualization
 
 ```csharp
-public enum VisualizationType
+public class MyVisualization : IVisualization
 {
-    Newton,
-    Mandelbrot,
-    Hailstone,
-    Julia  // ADD THIS
-}
-
-public static IVisualization Create(VisualizationType type)
-{
-    return type switch
+    private readonly MyVisualizationConfig _config;
+    
+    public string Name => "My Visualization";
+    public string Description => "Description of what it visualizes";
+    
+    public MyVisualization(MyVisualizationConfig? config = null)
     {
-        VisualizationType.Newton => new NewtonVisualization(),
-        VisualizationType.Mandelbrot => new MandelbrotVisualization(),
-        VisualizationType.Hailstone => new HailstoneVisualization(),
-        VisualizationType.Julia => new JuliaVisualization(),  // ADD THIS
-        _ => throw new ArgumentException($"Unknown visualization type: {type}")
-    };
-}
-
-public static Dictionary<VisualizationType, (string Name, string Description)> GetAvailableVisualizations()
-{
-    return new Dictionary<VisualizationType, (string, string)>
+        _config = config ?? new MyVisualizationConfig();
+    }
+    
+    public VisualizationConfig GetConfig() => _config;
+    
+    public IVisualization WithConfig(VisualizationConfig config)
     {
-        { VisualizationType.Newton, ("Newton's Method", "Root-finding in complex plane") },
-        { VisualizationType.Mandelbrot, ("Mandelbrot Set", "Classic fractal") },
-        { VisualizationType.Hailstone, ("Hailstone Sequence", "Collatz conjecture visualization") },
-        { VisualizationType.Julia, ("Julia Set", "Fractal with configurable constant") }  // ADD THIS
-    };
+        return new MyVisualization(config as MyVisualizationConfig);
+    }
+    
+    public Bitmap Render(int width, int height, double xRange, double yRange)
+    {
+        var bitmap = new Bitmap(width, height);
+        
+        // For pixel-based rendering
+        RenderingHelpers.RenderFast(bitmap, xRange, yRange, (x, y) =>
+        {
+            // Your computation
+            return Color.FromArgb(r, g, b);
+        });
+        
+        // Add axes if enabled
+        if (_config.ShowAxes)
+        {
+            RenderingHelpers.DrawAxesOnBitmap(bitmap, xRange, yRange);
+        }
+        
+        return bitmap;
+    }
 }
 ```
 
-### Step 3: Test Your Visualization
+### Step 3: Add to Factory
 
-Update `Program.cs` to test:
+Update `VisualizationFactory.cs` to include your new type.
+
+### Step 4: Add Menu Items and Event Handlers
+
+Add menu integration in `Canvas.cs` and `Canvas.Designer.cs`.
+
+---
+
+## Adding Presets
+
+Presets focus on analytical perspectives, not display options.
+
+### Guidelines
+
+1. **Same starting conditions** for comparable results
+2. **Different analytical views** - Vary iterations, scale
+3. **Descriptive names** - Indicate what the preset shows
+4. **3-5 presets** - Don't overwhelm users
+
+### Example
 
 ```csharp
-static void Main()
+public static Dictionary<string, MyVisualizationConfig> MyVisualizationPresets = new()
 {
-    ApplicationConfiguration.Initialize();
+    ["Default - Balanced View"] = new MyVisualizationConfig
+    {
+        MaxIterations = 500,
+        ShowAxes = true
+    },
     
-    var canvas = new Canvas();
-    canvas.SetVisualization(VisualizationFactory.VisualizationType.Julia);
-    
-    Application.Run(canvas);
-}
-```
-
-Or programmatically:
-
-```csharp
-var config = new JuliaConfig 
-{ 
-    C = new Complex(-0.4, 0.6),  // Different Julia set
-    MaxIterations = 512 
+    ["High Detail"] = new MyVisualizationConfig
+    {
+        MaxIterations = 2000,
+        ShowAxes = true
+    }
 };
-var julia = new JuliaVisualization(config);
-var bitmap = julia.Render(1920, 1080, 4.0, 4.0);
-bitmap.Save(@"C:\Temp\julia.png");
 ```
 
-## Best Practices
+---
 
-### 1. Configuration Defaults
+## Display Options
 
-Always provide sensible defaults in the constructor:
+### Universal Options
+
+**ShowAxes** - Available for all visualizations
+- Add to toolbar for live toggling
+- Use cached overlay for fractals (performance)
+
+### Visualization-Specific Options
+
+Add to derived configs when needed:
 
 ```csharp
-public MyConfig()
-{
-    MaxIterations = 100;  // Reasonable default
-    Tolerance = 1e-6;     // Sensible precision
-}
+[Category("Display - MyVisualization Specific")]
+[Description("Show custom feature")]
+public bool ShowCustomFeature { get; set; } = true;
 ```
 
-### 2. Parameter Documentation
+---
 
-Document what each parameter does:
+## Performance Considerations
 
-```csharp
-/// <summary>
-/// Escape radius - values beyond this are considered divergent
-/// Typical range: 2.0 to 1000000.0
-/// </summary>
-public double EscapeRadius { get; set; } = 2.0;
-```
+### Rendering Strategies
 
-### 3. Performance Considerations
+**Pixel-Based:** Use `RenderingHelpers.RenderFast()` with parallel computation
 
-For expensive operations, consider:
+**Vector-Based:** Use Graphics API, integrate axes into rendering
 
-```csharp
-// Cache frequently used values
-double escapeRadiusSquared = _config.EscapeRadius * _config.EscapeRadius;
+### Optimization Tips
 
-// Use squared magnitude to avoid sqrt
-while (z.Real * z.Real + z.Imaginary * z.Imaginary < escapeRadiusSquared)
-{
-    // ...
-}
-```
+1. Use LockBits for pixel manipulation
+2. Parallelize with `Parallel.For`
+3. Cache overlays for expensive computations
+4. Dispose resources properly
 
-### 4. Color Mapping
-
-Use the existing `Spectrum360` palette for consistency:
-
-```csharp
-// Simple mapping
-var cs = ColorPalettes.Spectrum360[iterations % 360];
-
-// With offset
-var cs = ColorPalettes.Spectrum360[(iterations + offset) % 360];
-
-// Based on value
-int hueIndex = (int)(value * 360.0) % 360;
-var cs = ColorPalettes.Spectrum360[hueIndex];
-```
-
-### 5. Error Handling
-
-Handle edge cases gracefully:
-
-```csharp
-public Bitmap Render(int width, int height, double xRange, double yRange)
-{
-    if (width <= 0 || height <= 0)
-        throw new ArgumentException("Width and height must be positive");
-        
-    var bitmap = new Bitmap(width, height);
-    // ...
-}
-```
-
-## Ideas for New Visualizations
-
-Here are some suggestions for visualizations you could add:
-
-### Easy
-- **Burning Ship Fractal** - Similar to Mandelbrot
-- **Tricorn Fractal** - Conjugate version of Mandelbrot
-- **Different Newton Fractals** - Change the function in `Functions.cs`
-
-### Moderate
-- **Lorenz Attractor** - 3D chaotic system projected to 2D
-- **Bifurcation Diagram** - Shows chaos in parametric systems
-- **Apollonian Gasket** - Circle packing fractal
-- **Sierpinski Triangle** - Classic fractal triangle
-
-### Advanced
-- **Domain Coloring** - Visualize complex functions using color
-- **Buddhabrot** - Sampling-based Mandelbrot variant
-- **Flame Fractals** - IFS (Iterated Function Systems)
-- **L-Systems** - Lindenmayer systems for plant-like fractals
+---
 
 ## Testing Checklist
 
-Before submitting your visualization:
+- [ ] Visualization renders correctly
+- [ ] Presets load and apply
+- [ ] Settings dialog works
+- [ ] Toolbar buttons update correctly
+- [ ] Axes toggle works
+- [ ] No memory leaks
 
-- [ ] Builds without errors or warnings
-- [ ] Renders correctly at various resolutions
-- [ ] Configuration parameters have sensible defaults
-- [ ] Code is documented with XML comments
-- [ ] Added to `VisualizationFactory` enum and methods
-- [ ] Tested with different parameter values
-- [ ] No obvious performance issues
-- [ ] Follows existing code style
+---
 
-## Getting Help
+## Questions?
 
-If you need assistance:
-1. Check existing visualization implementations as examples
-2. Review the `README.md` for architecture overview
-3. Look at `EXAMPLES.md` for usage patterns
-4. Open an issue on GitHub with your questions
+Check existing visualizations as examples or review the documentation files.
 
-Happy coding! 🎨
+Thank you for contributing! 🎨✨
