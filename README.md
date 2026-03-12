@@ -1,6 +1,6 @@
 # Numerical Visualizations
 
-A .NET 6 WinForms application for visualizing various numerical and mathematical concepts through beautiful, interactive graphics with a flexible, user-friendly interface.
+A .NET 10 WinForms application for visualizing various numerical and mathematical concepts through beautiful, interactive graphics with a flexible, user-friendly interface.
 
 ## Features
 
