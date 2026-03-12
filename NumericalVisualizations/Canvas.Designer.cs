@@ -31,6 +31,12 @@
             panel1 = new Panel();
             menuStrip1 = new MenuStrip();
             fileToolStripMenuItem = new ToolStripMenuItem();
+            exportToolStripMenuItem = new ToolStripMenuItem();
+            exportPNGToolStripMenuItem = new ToolStripMenuItem();
+            exportJPEGToolStripMenuItem = new ToolStripMenuItem();
+            exportBMPToolStripMenuItem = new ToolStripMenuItem();
+            exportSVGToolStripMenuItem = new ToolStripMenuItem();
+            toolStripSeparator3 = new ToolStripSeparator();
             exitToolStripMenuItem = new ToolStripMenuItem();
             visualizationsToolStripMenuItem = new ToolStripMenuItem();
             newtonsMethodToolStripMenuItem = new ToolStripMenuItem();
@@ -66,10 +72,51 @@
             // 
             // fileToolStripMenuItem
             // 
-            fileToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { exitToolStripMenuItem });
+            fileToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { exportToolStripMenuItem, toolStripSeparator3, exitToolStripMenuItem });
             fileToolStripMenuItem.Name = "fileToolStripMenuItem";
             fileToolStripMenuItem.Size = new Size(46, 24);
             fileToolStripMenuItem.Text = "&File";
+            // 
+            // exportToolStripMenuItem
+            // 
+            exportToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { exportPNGToolStripMenuItem, exportJPEGToolStripMenuItem, exportBMPToolStripMenuItem, exportSVGToolStripMenuItem });
+            exportToolStripMenuItem.Name = "exportToolStripMenuItem";
+            exportToolStripMenuItem.Size = new Size(180, 26);
+            exportToolStripMenuItem.Text = "&Export";
+            exportToolStripMenuItem.DropDownOpening += exportToolStripMenuItem_DropDownOpening;
+            // 
+            // exportPNGToolStripMenuItem
+            // 
+            exportPNGToolStripMenuItem.Name = "exportPNGToolStripMenuItem";
+            exportPNGToolStripMenuItem.Size = new Size(200, 26);
+            exportPNGToolStripMenuItem.Text = "Export as &PNG...";
+            exportPNGToolStripMenuItem.Click += exportPNGToolStripMenuItem_Click;
+            // 
+            // exportJPEGToolStripMenuItem
+            // 
+            exportJPEGToolStripMenuItem.Name = "exportJPEGToolStripMenuItem";
+            exportJPEGToolStripMenuItem.Size = new Size(200, 26);
+            exportJPEGToolStripMenuItem.Text = "Export as &JPEG...";
+            exportJPEGToolStripMenuItem.Click += exportJPEGToolStripMenuItem_Click;
+            // 
+            // exportBMPToolStripMenuItem
+            // 
+            exportBMPToolStripMenuItem.Name = "exportBMPToolStripMenuItem";
+            exportBMPToolStripMenuItem.Size = new Size(200, 26);
+            exportBMPToolStripMenuItem.Text = "Export as &BMP...";
+            exportBMPToolStripMenuItem.Click += exportBMPToolStripMenuItem_Click;
+            // 
+            // exportSVGToolStripMenuItem
+            // 
+            exportSVGToolStripMenuItem.Name = "exportSVGToolStripMenuItem";
+            exportSVGToolStripMenuItem.Size = new Size(200, 26);
+            exportSVGToolStripMenuItem.Text = "Export as &SVG...";
+            exportSVGToolStripMenuItem.Click += exportSVGToolStripMenuItem_Click;
+            // 
+            // toolStripSeparator3
+            // 
+            toolStripSeparator3.Name = "toolStripSeparator3";
+            toolStripSeparator3.Size = new Size(177, 6);
             // 
             // exitToolStripMenuItem
             // 
@@ -187,6 +234,12 @@
         protected internal Panel panel1;
         private MenuStrip menuStrip1;
         private ToolStripMenuItem fileToolStripMenuItem;
+        private ToolStripMenuItem exportToolStripMenuItem;
+        private ToolStripMenuItem exportPNGToolStripMenuItem;
+        private ToolStripMenuItem exportJPEGToolStripMenuItem;
+        private ToolStripMenuItem exportBMPToolStripMenuItem;
+        private ToolStripMenuItem exportSVGToolStripMenuItem;
+        private ToolStripSeparator toolStripSeparator3;
         private ToolStripMenuItem exitToolStripMenuItem;
         private ToolStripMenuItem visualizationsToolStripMenuItem;
         private ToolStripMenuItem newtonsMethodToolStripMenuItem;

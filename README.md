@@ -10,6 +10,14 @@ A .NET 10 WinForms application for visualizing various numerical and mathematica
 - Preset system with 3-5 curated configurations per visualization
 - Comprehensive settings dialog with Apply/Close workflow
 
+### 💾 **Export to Multiple Formats**
+- **PNG** - Lossless with full metadata (recommended for quality)
+- **JPEG** - Compressed with basic metadata (good for sharing)
+- **BMP** - Uncompressed lossless (archival)
+- **SVG** - Vector format with XML metadata (Hailstone only, infinitely scalable!)
+- Automatic timestamped filenames
+- Embedded reproducibility metadata in all formats
+
 ### ⚡ **Performance Optimizations**
 - Parallel rendering using LockBits for 20-100x speedup
 - Cached axes overlay for instant toggling on fractals (~50ms vs 1-2 seconds)
@@ -20,6 +28,7 @@ A .NET 10 WinForms application for visualizing various numerical and mathematica
 - **Toolbar Toggles**: Instantly enable/disable axes, point labels, and dots
 - **Settings Dialog**: Resizable PropertyGrid with live Apply button
 - **Preset System**: Quick access to analytical views (different iterations/scales)
+- **Export Menu**: File → Export with format-specific options
 
 ---
 
@@ -41,6 +50,24 @@ A .NET 10 WinForms application for visualizing various numerical and mathematica
 
 4. **Try presets**: Hover over a visualization name in the menu to see presets
 5. **Adjust settings**: Click Settings... at the bottom of any visualization's submenu
+6. **Export your work**: File → Export → Choose format (PNG, JPEG, BMP, or SVG)
+
+### Export Guide
+
+All exported images include comprehensive metadata for reproducibility:
+
+```
+File → Export →
+  ├─ PNG    - Lossless, full metadata (best quality-to-size ratio)
+  ├─ JPEG   - Compressed, basic metadata (smallest files)
+  ├─ BMP    - Uncompressed, no metadata (simple archival)
+  └─ SVG    - Vector, XML metadata (Hailstone only, infinite zoom!)
+```
+
+**Viewing Metadata:**
+- **PNG/JPEG**: Right-click file → Properties → Details tab
+- **SVG**: Open in Notepad (it's XML!) or any text editor
+- **Command-line**: Use included `View-ImageMetadata.ps1` PowerShell script
 
 ### Toolbar Guide
 

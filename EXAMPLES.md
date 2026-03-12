@@ -9,7 +9,8 @@ This document provides practical examples of using the Numerical Visualizations 
 2. [Using the Toolbar](#using-the-toolbar)
 3. [Working with Presets](#working-with-presets)
 4. [Settings Dialog](#settings-dialog)
-5. [Programmatic Usage](#programmatic-usage)
+5. [Exporting Images](#exporting-images)
+6. [Programmatic Usage](#programmatic-usage)
 
 ---
 
@@ -133,6 +134,121 @@ The toolbar provides instant display option toggling:
 4. Adjust ScaleFactor to 0.06
 5. Click **Apply** after each change to see effect
 6. Use toolbar to quickly toggle ShowAxes without opening settings again!
+
+---
+
+## Exporting Images
+
+### Example 1: Export Newton Fractal for Publication
+
+**Goal:** High-quality image with full metadata for paper
+
+```
+1. Press Ctrl+1 (Newton's Method)
+2. Load "High Detail" preset
+3. Toggle Axes on (if needed for reference)
+4. File → Export → Export as PNG...
+5. Save: "Newton_HighDetail_2024.png"
+```
+
+**Result:** PNG with embedded metadata:
+- Algorithm parameters (MaxIterations: 5000, Tolerance: 1e-12)
+- Color mapping formula
+- Coordinate system info
+- Timestamp
+
+**Use:** Open in paper → Right-click → Properties → Details to verify settings
+
+---
+
+### Example 2: SVG Export for Scalable Graphics
+
+**Goal:** Vector graphic that scales to any size
+
+```
+1. Press Ctrl+3 (Hailstone Sequence)
+2. Load "Default - Balanced View"
+3. File → Export → Export as SVG...
+4. Save: "Hailstone_Vector.svg"
+```
+
+**Result:** XML file with:
+- Vector path (infinitely scalable)
+- Complete metadata in `<desc>` tags
+- All algorithm parameters
+- Color palette documentation
+
+**Use:** Open in web browser → Zoom to 1000% → Still perfect!
+
+---
+
+### Example 3: Quick Share via JPEG
+
+**Goal:** Smallest file for email/social media
+
+```
+1. Render any visualization
+2. File → Export → Export as JPEG...
+3. Save with automatic timestamped name
+```
+
+**Result:** 
+- File size: ~150 KB (vs 800 KB PNG)
+- Basic metadata preserved
+- Good quality for sharing
+
+---
+
+### Example 4: Viewing Export Metadata
+
+**After exporting PNG:**
+
+```powershell
+# Method 1: Windows built-in
+Right-click image → Properties → Details → Comments
+
+# Method 2: PowerShell script
+.\View-ImageMetadata.ps1 "Newton_Method_20241219.png"
+
+# Method 3: For SVG, just open in text editor
+notepad "Hailstone_Sequence.svg"
+```
+
+**What you'll see:**
+```
+Visualization: Newton's Method
+Algorithm Parameters:
+  MaxIterations: 1200
+  Tolerance: 1.00E-10
+  HueSpread: 17
+Color Mapping:
+  Palette: Spectrum360 (360-degree HSV)
+  Method: Hue = (angle + iterations * 17) mod 360
+Display Settings:
+  ShowAxes: true
+```
+
+---
+
+### Example 5: Batch Export for Comparison
+
+**Goal:** Export all presets of a visualization
+
+```
+1. Select visualization (e.g., Mandelbrot - Ctrl+2)
+2. For each preset:
+   a. Visualizations → Mandelbrot Set → [Preset Name]
+   b. File → Export → PNG
+   c. Use auto-generated filename
+3. Result: Multiple timestamped files for comparison
+```
+
+**Files created:**
+```
+Mandelbrot_Set_20241219_140122.png  (Classic)
+Mandelbrot_Set_20241219_140145.png  (Deep Zoom)
+Mandelbrot_Set_20241219_140208.png  (Psychedelic)
+```
 
 ---
 
