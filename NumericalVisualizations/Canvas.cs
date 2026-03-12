@@ -654,9 +654,10 @@ namespace NumericalVisualizations
             }
             else if (config is HailstoneConfig hailstone)
             {
-                sb.AppendLine($"  StartX: {hailstone.StartX}");
-                sb.AppendLine($"  StartY: {hailstone.StartY}");
-                sb.AppendLine($"  ScaleFactor: {hailstone.ScaleFactor}");
+                sb.AppendLine($"  StartIntX: {hailstone.StartIntX} (integer coordinate)");
+                sb.AppendLine($"  StartIntY: {hailstone.StartIntY} (integer coordinate)");
+                sb.AppendLine($"  ScaleFactorX: {hailstone.ScaleFactorX} (0 = auto, X-axis spacing)");
+                sb.AppendLine($"  ScaleFactorY: {hailstone.ScaleFactorY} (0 = auto, Y-axis spacing)");
                 sb.AppendLine($"  LineWidth: {hailstone.LineWidth}");
                 sb.AppendLine($"  DotSize: {hailstone.DotSize}");
                 sb.AppendLine($"  ColorSpread: {hailstone.ColorSpread}");
@@ -721,15 +722,12 @@ namespace NumericalVisualizations
 
         private string GenerateHailstoneSVG(HailstoneConfig config, int width, int height)
         {
-            // Re-compute the Hailstone sequence to get points
-            var points = new List<(int step, double x, double y, Color color)>();
+            // First pass: Calculate all integer points (unscaled)
+            var intPoints = new List<(int step, int intX, int intY, Color color)>();
 
-            double currentX = config.StartX;
-            double currentY = config.StartY;
-            int intX = (int)Math.Round(currentX / config.ScaleFactor);
-            int intY = (int)Math.Round(currentY / config.ScaleFactor);
-
-            points.Add((0, currentX, currentY, Color.Red));
+            int intX = config.StartIntX;
+            int intY = config.StartIntY;
+            intPoints.Add((0, intX, intY, Color.Red));
 
             for (int index = 1; index <= config.MaxIterations; index++)
             {
@@ -739,17 +737,44 @@ namespace NumericalVisualizations
                 int nextIntX = Functions.FHailStoneNextX(intX, intY);
                 int nextIntY = Functions.FHailStoneNextY(intX, intY);
 
-                double nextX = nextIntX * config.ScaleFactor;
-                double nextY = nextIntY * config.ScaleFactor;
+                intPoints.Add((index, nextIntX, nextIntY, lineColor));
 
-                points.Add((index, nextX, nextY, lineColor));
-
-                currentX = nextX;
-                currentY = nextY;
                 intX = nextIntX;
                 intY = nextIntY;
 
                 if (intX == 1 && intY == 1) break;
+            }
+
+            // Auto-calculate scale factors if set to 0
+            double scaleX = config.ScaleFactorX;
+            double scaleY = config.ScaleFactorY;
+
+            if (scaleX == 0.0 || scaleY == 0.0)
+            {
+                // Focus on EARLY iterations to keep view near starting point
+                // Use first 30% of sequence (or 50 iterations max, whichever is less)
+                int iterationsForScaling = Math.Min(50, Math.Max(10, intPoints.Count * 30 / 100));
+                var earlyPoints = intPoints.Take(iterationsForScaling).ToList();
+
+                int minIntX = earlyPoints.Min(p => p.intX);
+                int maxIntX = earlyPoints.Max(p => p.intX);
+                int minIntY = earlyPoints.Min(p => p.intY);
+                int maxIntY = earlyPoints.Max(p => p.intY);
+
+                int rangeIntX = maxIntX - minIntX;
+                int rangeIntY = maxIntY - minIntY;
+
+                if (scaleX == 0.0)
+                    scaleX = rangeIntX > 0 ? 3.0 / rangeIntX : 0.05;
+                if (scaleY == 0.0)
+                    scaleY = rangeIntY > 0 ? 3.0 / rangeIntY : 0.05;
+            }
+
+            // Second pass: Convert to scaled coordinates
+            var points = new List<(int step, double x, double y, Color color)>();
+            foreach (var (step, ix, iy, color) in intPoints)
+            {
+                points.Add((step, ix * scaleX, iy * scaleY, color));
             }
 
             // Calculate bounds
@@ -816,9 +841,10 @@ namespace NumericalVisualizations
             svg.AppendLine();
             svg.AppendLine("      Algorithm Parameters:");
             svg.AppendLine($"        MaxIterations: {config.MaxIterations}");
-            svg.AppendLine($"        StartX: {config.StartX}");
-            svg.AppendLine($"        StartY: {config.StartY}");
-            svg.AppendLine($"        ScaleFactor: {config.ScaleFactor}");
+            svg.AppendLine($"        StartIntX: {config.StartIntX} (integer coordinate)");
+            svg.AppendLine($"        StartIntY: {config.StartIntY} (integer coordinate)");
+            svg.AppendLine($"        ScaleFactorX: {config.ScaleFactorX} (0 = auto-calculated)");
+            svg.AppendLine($"        ScaleFactorY: {config.ScaleFactorY} (0 = auto-calculated)");
             svg.AppendLine();
             svg.AppendLine("      Color Mapping:");
             svg.AppendLine($"        Palette: Spectrum360 (360-degree HSV color wheel)");
@@ -888,7 +914,11 @@ namespace NumericalVisualizations
                     float sx = screenCenterX + (float)((x - centerX) * pixelsPerUnitX);
                     float sy = screenCenterY - (float)((y - centerY) * pixelsPerUnitY);
 
-                    string label = $"({step}, {x:F2}, {y:F2})";
+                    // Calculate integer coordinates from scaled values
+                    int labelIntX = (int)Math.Round(x / config.ScaleFactor);
+                    int labelIntY = (int)Math.Round(y / config.ScaleFactor);
+                    string label = $"({step}, {labelIntX}, {labelIntY})";
+
                     svg.AppendLine($"  <text x=\"{sx + 8:F2}\" y=\"{sy + 4:F2}\" " +
                         $"fill=\"rgb(220,220,220)\" font-family=\"Arial\" font-size=\"8\">{label}</text>");
                 }

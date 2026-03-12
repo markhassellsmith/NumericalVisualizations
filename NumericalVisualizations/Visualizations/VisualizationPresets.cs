@@ -95,10 +95,11 @@ namespace NumericalVisualizations.Visualizations
         {
             ["Default - Balanced View"] = new HailstoneConfig 
             { 
-                StartX = -0.5,
-                StartY = 0.3,
+                StartIntX = -10,
+                StartIntY = 6,
                 MaxIterations = 150,
-                ScaleFactor = 0.05,
+                ScaleFactorX = 0.0,  // Auto-calculate
+                ScaleFactorY = 0.0,  // Auto-calculate
                 LineWidth = 0.002f,
                 DotSize = 0.012f,
                 ColorSpread = 7,
@@ -109,10 +110,11 @@ namespace NumericalVisualizations.Visualizations
 
             ["First 50 Steps - Early Behavior"] = new HailstoneConfig 
             { 
-                StartX = -0.5,
-                StartY = 0.3,
+                StartIntX = -10,
+                StartIntY = 6,
                 MaxIterations = 50,
-                ScaleFactor = 0.08,  // Larger scale to see detail
+                ScaleFactorX = 0.0,  // Auto-calculate (will be larger for fewer steps)
+                ScaleFactorY = 0.0,  // Auto-calculate
                 LineWidth = 0.003f,
                 DotSize = 0.018f,
                 ColorSpread = 10,
@@ -123,10 +125,11 @@ namespace NumericalVisualizations.Visualizations
 
             ["300 Steps - Long Term Behavior"] = new HailstoneConfig 
             { 
-                StartX = -0.5,
-                StartY = 0.3,
+                StartIntX = -10,
+                StartIntY = 6,
                 MaxIterations = 300,
-                ScaleFactor = 0.03,  // Smaller scale to fit more
+                ScaleFactorX = 0.0,  // Auto-calculate (will be smaller for more steps)
+                ScaleFactorY = 0.0,  // Auto-calculate
                 LineWidth = 0.001f,
                 DotSize = 0.006f,
                 ColorSpread = 5,

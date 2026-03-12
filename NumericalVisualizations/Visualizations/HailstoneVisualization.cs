@@ -10,17 +10,52 @@ namespace NumericalVisualizations.Visualizations
     /// </summary>
     public class HailstoneConfig : VisualizationConfig
     {
+        [Category("Algorithm")]
+        [Description("Starting X coordinate (INTEGER) - the actual integer used in Hailstone rules")]
+        public int StartIntX { get; set; } = -10;
+
+        [Category("Algorithm")]
+        [Description("Starting Y coordinate (INTEGER) - the actual integer used in Hailstone rules")]
+        public int StartIntY { get; set; } = 6;
+
         [Category("Appearance")]
         [Description("Color progression speed (degrees per step)")]
         public int ColorSpread { get; set; } = 7;
 
-        [Category("Algorithm")]
-        [Description("Starting X coordinate in coordinate space")]
-        public double StartX { get; set; } = -0.5;
+        [Category("Advanced - Display")]
+        [Description("X-axis scale factor (0 = auto-calculate based on sequence width)")]
+        public double ScaleFactorX { get; set; } = 0.0;
+
+        [Category("Advanced - Display")]
+        [Description("Y-axis scale factor (0 = auto-calculate based on sequence height)")]
+        public double ScaleFactorY { get; set; } = 0.0;
+
+        [Category("Advanced - Display")]
+        [Description("Unified scale factor (DEPRECATED - sets both X and Y equally)")]
+        [Browsable(false)]
+        public double ScaleFactor
+        {
+            get => (ScaleFactorX + ScaleFactorY) / 2;
+            set { ScaleFactorX = value; ScaleFactorY = value; }
+        }
 
         [Category("Algorithm")]
-        [Description("Starting Y coordinate in coordinate space")]
-        public double StartY { get; set; } = 0.3;
+        [Description("Starting X coordinate in coordinate space (DEPRECATED - use StartIntX instead)")]
+        [Browsable(false)]  // Hide from PropertyGrid
+        public double StartX 
+        { 
+            get => StartIntX * ((ScaleFactorX > 0) ? ScaleFactorX : 0.05);
+            set => StartIntX = (int)Math.Round(value / ((ScaleFactorX > 0) ? ScaleFactorX : 0.05));
+        }
+
+        [Category("Algorithm")]
+        [Description("Starting Y coordinate in coordinate space (DEPRECATED - use StartIntY instead)")]
+        [Browsable(false)]  // Hide from PropertyGrid
+        public double StartY 
+        { 
+            get => StartIntY * ((ScaleFactorY > 0) ? ScaleFactorY : 0.05);
+            set => StartIntY = (int)Math.Round(value / ((ScaleFactorY > 0) ? ScaleFactorY : 0.05));
+        }
 
         [Category("Appearance")]
         [Description("Thickness of line segments")]
@@ -37,10 +72,6 @@ namespace NumericalVisualizations.Visualizations
         [Category("Display - Hailstone Specific")]
         [Description("Show dots at segment endpoints")]
         public bool ShowDots { get; set; } = true;
-
-        [Category("Algorithm")]
-        [Description("Scale factor for movement size")]
-        public double ScaleFactor { get; set; } = 0.05;
 
         public HailstoneConfig()
         {
@@ -84,15 +115,12 @@ namespace NumericalVisualizations.Visualizations
             graphics.SmoothingMode = SmoothingMode.AntiAlias;
             graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
 
-            // First pass: Calculate all points and determine bounds
-            var points = new List<(int step, double x, double y, Color color)>();
+            // First pass: Calculate all integer points (unscaled) to determine actual range
+            var intPoints = new List<(int step, int intX, int intY, Color color)>();
 
-            double currentX = _config.StartX;
-            double currentY = _config.StartY;
-            int intX = (int)Math.Round(currentX / _config.ScaleFactor);
-            int intY = (int)Math.Round(currentY / _config.ScaleFactor);
-
-            points.Add((0, currentX, currentY, Color.Red));
+            int intX = _config.StartIntX;
+            int intY = _config.StartIntY;
+            intPoints.Add((0, intX, intY, Color.Red));
 
             for (int index = 1; index <= _config.MaxIterations; index++)
             {
@@ -102,17 +130,46 @@ namespace NumericalVisualizations.Visualizations
                 int nextIntX = Functions.FHailStoneNextX(intX, intY);
                 int nextIntY = Functions.FHailStoneNextY(intX, intY);
 
-                double nextX = nextIntX * _config.ScaleFactor;
-                double nextY = nextIntY * _config.ScaleFactor;
+                intPoints.Add((index, nextIntX, nextIntY, lineColor));
 
-                points.Add((index, nextX, nextY, lineColor));
-
-                currentX = nextX;
-                currentY = nextY;
                 intX = nextIntX;
                 intY = nextIntY;
 
                 if (intX == 1 && intY == 1) break;
+            }
+
+            // Auto-calculate scale factors if set to 0
+            double scaleX = _config.ScaleFactorX;
+            double scaleY = _config.ScaleFactorY;
+
+            if (scaleX == 0.0 || scaleY == 0.0)
+            {
+                // Focus on EARLY iterations to keep view near starting point
+                // Use first 30% of sequence (or 50 iterations max, whichever is less)
+                int iterationsForScaling = Math.Min(50, Math.Max(10, intPoints.Count * 30 / 100));
+                var earlyPoints = intPoints.Take(iterationsForScaling).ToList();
+
+                // Find integer coordinate ranges from early behavior only
+                int minIntX = earlyPoints.Min(p => p.intX);
+                int maxIntX = earlyPoints.Max(p => p.intX);
+                int minIntY = earlyPoints.Min(p => p.intY);
+                int maxIntY = earlyPoints.Max(p => p.intY);
+
+                int rangeIntX = maxIntX - minIntX;
+                int rangeIntY = maxIntY - minIntY;
+
+                // Calculate scales to fit in ~3 unit space (with padding)
+                if (scaleX == 0.0)
+                    scaleX = rangeIntX > 0 ? 3.0 / rangeIntX : 0.05;
+                if (scaleY == 0.0)
+                    scaleY = rangeIntY > 0 ? 3.0 / rangeIntY : 0.05;
+            }
+
+            // Second pass: Convert integer points to scaled coordinates for rendering
+            var points = new List<(int step, double x, double y, Color color)>();
+            foreach (var (step, ix, iy, color) in intPoints)
+            {
+                points.Add((step, ix * scaleX, iy * scaleY, color));
             }
 
             // Calculate bounds with padding
@@ -201,21 +258,144 @@ namespace NumericalVisualizations.Visualizations
             // Restore original transform for labels
             graphics.Transform = originalTransform;
 
-            // Always draw axis tick labels if axes are shown
+            // Always draw axis tick labels if axes are shown (using INTEGER coordinates)
             if (_config.ShowAxes)
             {
-                DrawAxisLabels(graphics, width, height, dataRangeX, dataRangeY, centerX, centerY,
-                    screenCenterX, screenCenterY, pixelsPerUnitX, pixelsPerUnitY);
+                DrawAxisLabelsInIntegerSpace(graphics, width, height, intPoints, 
+                    dataRangeX, dataRangeY, centerX, centerY,
+                    screenCenterX, screenCenterY, pixelsPerUnitX, pixelsPerUnitY,
+                    scaleX, scaleY);
             }
 
             // Draw point coordinate labels on top if enabled
             if (_config.ShowPointLabels)
             {
-                DrawPointLabels(graphics, points, screenCenterX, screenCenterY, 
-                    pixelsPerUnitX, pixelsPerUnitY, centerX, centerY);
+                DrawPointLabelsInIntegerSpace(graphics, intPoints, screenCenterX, screenCenterY, 
+                    pixelsPerUnitX, pixelsPerUnitY, centerX, centerY, scaleX, scaleY);
             }
 
             return bitmap;
+        }
+
+        private void DrawPointLabelsInIntegerSpace(Graphics graphics, List<(int step, int intX, int intY, Color color)> intPoints,
+            int screenCenterX, int screenCenterY, float pixelsPerUnitX, float pixelsPerUnitY,
+            double dataCenterX, double dataCenterY, double scaleX, double scaleY)
+        {
+            using var font = new Font("Arial", 8);
+            using var brush = new SolidBrush(Color.White);
+            using var backBrush = new SolidBrush(Color.FromArgb(180, 0, 0, 0));
+
+            foreach (var (step, intX, intY, color) in intPoints)
+            {
+                // Convert integer to scaled coordinates for positioning
+                double x = intX * scaleX;
+                double y = intY * scaleY;
+
+                float screenX = screenCenterX + (float)((x - dataCenterX) * pixelsPerUnitX);
+                float screenY = screenCenterY - (float)((y - dataCenterY) * pixelsPerUnitY);
+
+                // Format label with INTEGER coordinates
+                string label = $"({step}, {intX}, {intY})";
+
+                SizeF textSize = graphics.MeasureString(label, font);
+                float labelX = screenX + 8;
+                float labelY = screenY + 2;
+
+                graphics.FillRectangle(backBrush, 
+                    labelX - 2, labelY - 2, 
+                    textSize.Width + 4, textSize.Height + 4);
+
+                brush.Color = Color.FromArgb(255, 220, 220, 220);
+                graphics.DrawString(label, font, brush, labelX, labelY);
+            }
+        }
+
+        private void DrawAxisLabelsInIntegerSpace(Graphics graphics, int width, int height, 
+            List<(int step, int intX, int intY, Color color)> intPoints,
+            double xRange, double yRange, double dataCenterX, double dataCenterY, 
+            int screenCenterX, int screenCenterY, float pixelsPerUnitX, float pixelsPerUnitY,
+            double scaleX, double scaleY)
+        {
+            using var font = new Font("Arial", 9);
+            using var brush = new SolidBrush(Color.FromArgb(200, 220, 220, 220));
+            using var format = new StringFormat { Alignment = StringAlignment.Center };
+
+            // Find integer coordinate ranges
+            int minIntX = intPoints.Min(p => p.intX);
+            int maxIntX = intPoints.Max(p => p.intX);
+            int minIntY = intPoints.Min(p => p.intY);
+            int maxIntY = intPoints.Max(p => p.intY);
+
+            int intRangeX = maxIntX - minIntX;
+            int intRangeY = maxIntY - minIntY;
+
+            // Calculate nice integer tick spacing (powers of 10: 1, 2, 5, 10, 20, 50, etc.)
+            int xTickSpacing = CalculateNiceIntegerSpacing(intRangeX);
+            int yTickSpacing = CalculateNiceIntegerSpacing(intRangeY);
+
+            // Draw X-axis labels (positioned along y=0 axis)
+            int xStart = ((minIntX / xTickSpacing) - 1) * xTickSpacing;
+            int xEnd = ((maxIntX / xTickSpacing) + 1) * xTickSpacing;
+
+            for (int intX = xStart; intX <= xEnd; intX += xTickSpacing)
+            {
+                if (intX == 0) continue; // Skip origin
+
+                // Convert integer coordinate to scaled then to screen
+                double scaledX = intX * scaleX;
+                float screenX = screenCenterX + (float)((scaledX - dataCenterX) * pixelsPerUnitX);
+
+                // Position label ON the X-axis (y=0 in data space)
+                double scaled_Y_Zero = 0.0;
+                float screenY = screenCenterY - (float)((scaled_Y_Zero - dataCenterY) * pixelsPerUnitY);
+
+                // Only draw if on screen
+                if (screenX >= 0 && screenX <= width)
+                {
+                    graphics.DrawString(intX.ToString(), font, brush, screenX, screenY + 5, format);
+                }
+            }
+
+            // Draw Y-axis labels (positioned along x=0 axis)
+            int yStart = ((minIntY / yTickSpacing) - 1) * yTickSpacing;
+            int yEnd = ((maxIntY / yTickSpacing) + 1) * yTickSpacing;
+
+            for (int intY = yStart; intY <= yEnd; intY += yTickSpacing)
+            {
+                if (intY == 0) continue; // Skip origin
+
+                // Convert integer coordinate to scaled then to screen
+                double scaledY = intY * scaleY;
+                float screenY = screenCenterY - (float)((scaledY - dataCenterY) * pixelsPerUnitY);
+
+                // Position label ON the Y-axis (x=0 in data space)
+                double scaled_X_Zero = 0.0;
+                float screenX = screenCenterX + (float)((scaled_X_Zero - dataCenterX) * pixelsPerUnitX);
+
+                // Only draw if on screen
+                if (screenY >= 0 && screenY <= height)
+                {
+                    format.Alignment = StringAlignment.Far;
+                    graphics.DrawString(intY.ToString(), font, brush, screenX - 5, screenY - 8, format);
+                }
+            }
+        }
+
+        private int CalculateNiceIntegerSpacing(int range)
+        {
+            if (range <= 0) return 1;
+
+            // Target ~5-10 tick marks
+            int roughSpacing = range / 7;
+
+            // Round to nice numbers: 1, 2, 5, 10, 20, 50, 100, etc.
+            int magnitude = (int)Math.Pow(10, Math.Floor(Math.Log10(roughSpacing)));
+            int normalized = roughSpacing / magnitude;
+
+            if (normalized <= 1) return magnitude;
+            if (normalized <= 2) return 2 * magnitude;
+            if (normalized <= 5) return 5 * magnitude;
+            return 10 * magnitude;
         }
 
         private void DrawAxes(Graphics graphics, double xRange, double yRange, double centerX, double centerY)
@@ -228,150 +408,18 @@ namespace NumericalVisualizations.Visualizations
             double yMin = centerY - yRange / 2.0;
             double yMax = centerY + yRange / 2.0;
 
-            // Calculate nice tick spacing
-            double xTickSpacing = CalculateNiceSpacing(xRange);
-            double yTickSpacing = CalculateNiceSpacing(yRange);
-
             // Draw main axes (only if they're visible in the current view)
             // X-axis (y=0)
             if (yMin <= 0 && yMax >= 0)
             {
                 graphics.DrawLine(axisPen, (float)xMin, 0, (float)xMax, 0);
-
-                // X-axis ticks
-                float tickSize = 0.03f * (float)yRange;
-                double xStart = Math.Ceiling(xMin / xTickSpacing) * xTickSpacing;
-                for (double x = xStart; x <= xMax; x += xTickSpacing)
-                {
-                    if (Math.Abs(x) > xTickSpacing / 2) // Skip origin
-                        graphics.DrawLine(axisPen, (float)x, -tickSize, (float)x, tickSize);
-                }
             }
 
             // Y-axis (x=0)
             if (xMin <= 0 && xMax >= 0)
             {
                 graphics.DrawLine(axisPen, 0, (float)yMin, 0, (float)yMax);
-
-                // Y-axis ticks
-                float tickSize = 0.03f * (float)xRange;
-                double yStart = Math.Ceiling(yMin / yTickSpacing) * yTickSpacing;
-                for (double y = yStart; y <= yMax; y += yTickSpacing)
-                {
-                    if (Math.Abs(y) > yTickSpacing / 2) // Skip origin
-                        graphics.DrawLine(axisPen, -tickSize, (float)y, tickSize, (float)y);
-                }
             }
-        }
-
-        private void DrawPointLabels(Graphics graphics, List<(int step, double x, double y, Color color)> points, 
-            int screenCenterX, int screenCenterY, float pixelsPerUnitX, float pixelsPerUnitY,
-            double dataCenterX, double dataCenterY)
-        {
-            using var font = new Font("Arial", 8);
-            using var brush = new SolidBrush(Color.White);
-            using var backBrush = new SolidBrush(Color.FromArgb(180, 0, 0, 0)); // Semi-transparent background
-
-            foreach (var (step, x, y, color) in points)
-            {
-                // Convert mathematical coordinates to screen coordinates
-                float screenX = screenCenterX + (float)((x - dataCenterX) * pixelsPerUnitX);
-                float screenY = screenCenterY - (float)((y - dataCenterY) * pixelsPerUnitY);
-
-                // Format label as (N, X, Y)
-                string label = $"({step}, {x:F2}, {y:F2})";
-
-                // Measure text size for background
-                SizeF textSize = graphics.MeasureString(label, font);
-
-                // Position label offset from the point (bottom-right)
-                float labelX = screenX + 8;
-                float labelY = screenY + 2;
-
-                // Draw semi-transparent background for readability
-                graphics.FillRectangle(backBrush, 
-                    labelX - 2, labelY - 2, 
-                    textSize.Width + 4, textSize.Height + 4);
-
-                // Draw label
-                brush.Color = Color.FromArgb(255, 220, 220, 220);
-                graphics.DrawString(label, font, brush, labelX, labelY);
-            }
-        }
-
-        private void DrawAxisLabels(Graphics graphics, int width, int height, double xRange, double yRange,
-            double dataCenterX, double dataCenterY, int screenCenterX, int screenCenterY,
-            float pixelsPerUnitX, float pixelsPerUnitY)
-        {
-            using var font = new Font("Arial", 9);
-            using var brush = new SolidBrush(Color.FromArgb(200, 220, 220, 220));
-            using var format = new StringFormat { Alignment = StringAlignment.Center };
-
-            double xTickSpacing = CalculateNiceSpacing(xRange);
-            double yTickSpacing = CalculateNiceSpacing(yRange);
-
-            double xMin = dataCenterX - xRange / 2.0;
-            double xMax = dataCenterX + xRange / 2.0;
-            double yMin = dataCenterY - yRange / 2.0;
-            double yMax = dataCenterY + yRange / 2.0;
-
-            // X-axis labels (only if X-axis is visible)
-            if (yMin <= 0 && yMax >= 0)
-            {
-                double xStart = Math.Ceiling(xMin / xTickSpacing) * xTickSpacing;
-                for (double x = xStart; x <= xMax; x += xTickSpacing)
-                {
-                    if (Math.Abs(x) < xTickSpacing / 2) continue; // Skip origin
-                    float screenX = screenCenterX + (float)((x - dataCenterX) * pixelsPerUnitX);
-                    float screenY = screenCenterY - (float)((0 - dataCenterY) * pixelsPerUnitY);
-                    string label = x.ToString("F1");
-                    graphics.DrawString(label, font, brush, screenX, screenY + 15, format);
-                }
-            }
-
-            // Y-axis labels (only if Y-axis is visible)
-            if (xMin <= 0 && xMax >= 0)
-            {
-                format.Alignment = StringAlignment.Far;
-                double yStart = Math.Ceiling(yMin / yTickSpacing) * yTickSpacing;
-                for (double y = yStart; y <= yMax; y += yTickSpacing)
-                {
-                    if (Math.Abs(y) < yTickSpacing / 2) continue; // Skip origin
-                    float screenX = screenCenterX + (float)((0 - dataCenterX) * pixelsPerUnitX);
-                    float screenY = screenCenterY - (float)((y - dataCenterY) * pixelsPerUnitY);
-                    string label = y.ToString("F1");
-                    graphics.DrawString(label, font, brush, screenX - 10, screenY - 7, format);
-                }
-            }
-
-            // Origin label (only if visible)
-            if (xMin <= 0 && xMax >= 0 && yMin <= 0 && yMax >= 0)
-            {
-                format.Alignment = StringAlignment.Far;
-                float screenX = screenCenterX + (float)((0 - dataCenterX) * pixelsPerUnitX);
-                float screenY = screenCenterY - (float)((0 - dataCenterY) * pixelsPerUnitY);
-                graphics.DrawString("0", font, brush, screenX - 5, screenY + 5, format);
-            }
-        }
-
-        private double CalculateNiceSpacing(double range)
-        {
-            // Calculate a nice spacing value for tick marks
-            double roughSpacing = range / 8.0; // Aim for about 8 divisions
-            double magnitude = Math.Pow(10, Math.Floor(Math.Log10(roughSpacing)));
-            double normalized = roughSpacing / magnitude;
-
-            double niceSpacing;
-            if (normalized < 1.5)
-                niceSpacing = 1.0;
-            else if (normalized < 3.0)
-                niceSpacing = 2.0;
-            else if (normalized < 7.0)
-                niceSpacing = 5.0;
-            else
-                niceSpacing = 10.0;
-
-            return niceSpacing * magnitude;
         }
     }
 }
