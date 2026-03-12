@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.IO;
 using static NumericalVisualizations.ScreenStructures;
 
 namespace NumericalVisualizations.Visualizations
@@ -73,6 +74,10 @@ namespace NumericalVisualizations.Visualizations
         [Description("Show dots at segment endpoints")]
         public bool ShowDots { get; set; } = true;
 
+        [Category("Algorithm")]
+        [Description("Detect and highlight cycles (when sequence returns to a previous point)")]
+        public bool DetectCycles { get; set; } = true;
+
         public HailstoneConfig()
         {
             MaxIterations = 150;
@@ -117,10 +122,16 @@ namespace NumericalVisualizations.Visualizations
 
             // First pass: Calculate all integer points (unscaled) to determine actual range
             var intPoints = new List<(int step, int intX, int intY, Color color)>();
+            var visitedPoints = new HashSet<(int, int)>();  // For cycle detection
 
             int intX = _config.StartIntX;
             int intY = _config.StartIntY;
             intPoints.Add((0, intX, intY, Color.Red));
+            visitedPoints.Add((intX, intY));
+
+            int cycleStartStep = -1;
+            int cycleEndStep = -1;
+            (int cycleX, int cycleY) = (0, 0);
 
             for (int index = 1; index <= _config.MaxIterations; index++)
             {
@@ -135,8 +146,32 @@ namespace NumericalVisualizations.Visualizations
                 intX = nextIntX;
                 intY = nextIntY;
 
-                if (intX == 1 && intY == 1) break;
+                // Cycle detection
+                if (_config.DetectCycles && visitedPoints.Contains((intX, intY)))
+                {
+                    // Found a cycle! Find where it started
+                    cycleEndStep = index;
+                    cycleX = intX;
+                    cycleY = intY;
+
+                    for (int i = 0; i < intPoints.Count; i++)
+                    {
+                        if (intPoints[i].intX == intX && intPoints[i].intY == intY)
+                        {
+                            cycleStartStep = i;
+                            break;
+                        }
+                    }
+
+                    System.Diagnostics.Debug.WriteLine($"CYCLE DETECTED! Point ({intX}, {intY}) repeats at step {cycleEndStep}, first seen at step {cycleStartStep}. Cycle length: {cycleEndStep - cycleStartStep}");
+                    break;
+                }
+
+                visitedPoints.Add((intX, intY));
             }
+
+            // Export sequence points to CSV file for verification (include cycle info)
+            ExportPointsToCSV(intPoints, cycleStartStep, cycleEndStep, cycleX, cycleY);
 
             // Auto-calculate scale factors if set to 0
             double scaleX = _config.ScaleFactorX;
@@ -230,6 +265,7 @@ namespace NumericalVisualizations.Visualizations
             // Second pass: Draw lines and dots using calculated points
             float penWidth = _config.LineWidth;
             using Pen drawingPen = new Pen(Color.Red, penWidth);
+            using Pen cyclePen = new Pen(Color.Magenta, penWidth * 2.5f);  // Thicker, bright magenta for cycle
             using SolidBrush dotBrush = new SolidBrush(Color.White);
 
             // Draw lines
@@ -238,8 +274,18 @@ namespace NumericalVisualizations.Visualizations
                 var (step1, x1, y1, color1) = points[i];
                 var (step2, x2, y2, color2) = points[i + 1];
 
-                drawingPen.Color = color2;
-                graphics.DrawLine(drawingPen, (float)x1, (float)y1, (float)x2, (float)y2);
+                // Check if this segment is part of the cycle
+                bool isInCycle = cycleStartStep >= 0 && i >= cycleStartStep && i < cycleEndStep;
+
+                if (isInCycle)
+                {
+                    graphics.DrawLine(cyclePen, (float)x1, (float)y1, (float)x2, (float)y2);
+                }
+                else
+                {
+                    drawingPen.Color = color2;
+                    graphics.DrawLine(drawingPen, (float)x1, (float)y1, (float)x2, (float)y2);
+                }
             }
 
             // Draw dots at each segment end
@@ -273,6 +319,31 @@ namespace NumericalVisualizations.Visualizations
                 DrawPointLabelsInIntegerSpace(graphics, intPoints, screenCenterX, screenCenterY, 
                     pixelsPerUnitX, pixelsPerUnitY, centerX, centerY, scaleX, scaleY);
             }
+
+            // Draw sequence information overlay (matches CSV header format)
+            using var font = new Font("Arial", 14, FontStyle.Bold);
+            using var brush = new SolidBrush(Color.Yellow);
+            using var backBrush = new SolidBrush(Color.FromArgb(220, 0, 0, 0));
+
+            string infoText = $"Hailstone Sequence (N,X,Y)\n" +
+                             $"Starting point: (0, {intPoints[0].intX}, {intPoints[0].intY})\n" +
+                             $"Total points: {intPoints.Count}";
+
+            if (cycleStartStep >= 0)
+            {
+                int cycleLength = cycleEndStep - cycleStartStep;
+                infoText += $"\nCycle Detected: Point ({cycleEndStep}, {cycleX}, {cycleY})\n" +
+                           $"Duplicate of: ({cycleStartStep}, {cycleX}, {cycleY})\n" +
+                           $"Cycle length: {cycleLength}";
+                brush.Color = Color.Magenta;  // Use magenta for cycle info
+            }
+
+            var textSize = graphics.MeasureString(infoText, font);
+            float textX = 10;
+            float textY = 10;
+
+            graphics.FillRectangle(backBrush, textX - 5, textY - 5, textSize.Width + 10, textSize.Height + 10);
+            graphics.DrawString(infoText, font, brush, textX, textY);
 
             return bitmap;
         }
@@ -385,11 +456,21 @@ namespace NumericalVisualizations.Visualizations
         {
             if (range <= 0) return 1;
 
+            // For very small ranges, just use spacing of 1
+            if (range <= 7) return 1;
+
             // Target ~5-10 tick marks
             int roughSpacing = range / 7;
 
+            // Protect against roughSpacing being 0 (should not happen now, but safety check)
+            if (roughSpacing == 0) return 1;
+
             // Round to nice numbers: 1, 2, 5, 10, 20, 50, 100, etc.
             int magnitude = (int)Math.Pow(10, Math.Floor(Math.Log10(roughSpacing)));
+
+            // Protect against magnitude being 0
+            if (magnitude == 0) magnitude = 1;
+
             int normalized = roughSpacing / magnitude;
 
             if (normalized <= 1) return magnitude;
@@ -419,6 +500,64 @@ namespace NumericalVisualizations.Visualizations
             if (xMin <= 0 && xMax >= 0)
             {
                 graphics.DrawLine(axisPen, 0, (float)yMin, 0, (float)yMax);
+            }
+        }
+
+        /// <summary>
+        /// Export Hailstone sequence points to CSV file for analysis and verification
+        /// </summary>
+        private void ExportPointsToCSV(List<(int step, int intX, int intY, Color color)> intPoints, 
+                                       int cycleStartStep, int cycleEndStep, int cycleX, int cycleY)
+        {
+            try
+            {
+                var path = @"C:\Temp\Fractal Copies\New Project Effort\hailstone_points.csv";
+
+                // Ensure directory exists
+                var directory = Path.GetDirectoryName(path);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                using (var writer = new StreamWriter(path))
+                {
+                    // Write header comments with sequence info - no commas to avoid CSV parsing issues
+                    writer.WriteLine("# Hailstone Sequence (N X Y)");
+                    writer.WriteLine($"# Starting point: (0 {intPoints[0].intX} {intPoints[0].intY})");
+                    writer.WriteLine($"# Total points: {intPoints.Count}");
+
+                    if (cycleStartStep >= 0)
+                    {
+                        int cycleLength = cycleEndStep - cycleStartStep;
+                        writer.WriteLine($"# Cycle Detected: Point ({cycleEndStep} {cycleX} {cycleY})");
+                        writer.WriteLine($"# Duplicate of: ({cycleStartStep} {cycleX} {cycleY})");
+                        writer.WriteLine($"# Cycle length: {cycleLength}");
+                    }
+                    else
+                    {
+                        writer.WriteLine($"# No cycle detected - stopped at MaxIterations");
+                    }
+
+                    writer.WriteLine("#");
+
+                    // Header row with spaces after commas
+                    writer.WriteLine("N, X, Y");
+
+                    // Data rows: step number and integer coordinates
+                    for (int i = 0; i < intPoints.Count; i++)
+                    {
+                        var p = intPoints[i];
+                        writer.WriteLine($"{p.step}, {p.intX}, {p.intY}");
+                    }
+                }
+
+                System.Diagnostics.Debug.WriteLine($"Exported {intPoints.Count} points to {path}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to export CSV: {ex.Message}");
+                // Don't crash visualization if CSV export fails
             }
         }
     }
